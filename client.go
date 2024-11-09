@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net/url"
 	"os"
@@ -31,7 +32,14 @@ func main() {
 	u := url.URL{Scheme: getScheme(), Host: serverAddr, Path: "/ws"}
 	fmt.Printf("连接到 %s\n", u.String())
 
-	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	// 创建一个自定义的Dialer，其中包含跳过证书验证的TLS配置
+	dialer := websocket.Dialer{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true, // 跳过证书验证
+		},
+	}
+
+	c, _, err := dialer.Dial(u.String(), nil)
 	if err != nil {
 		fmt.Println("连接失败:", err)
 		return
