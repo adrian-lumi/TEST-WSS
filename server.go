@@ -47,9 +47,7 @@ func handleConnection(conn net.Conn) {
 			fmt.Printf("[%s] Received: %s\n", sessionID, string(buf[:n]))
 		}
 	} else {
-		fmt.Fprintf(conn, "HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\n\r\nBad Request")
-		fmt.Printf("[%s] Bad WebSocket upgrade request\n", sessionID)
-		common.SendFeishuMessage("Bad WebSocket upgrade request")
+		fmt.Fprintf(conn, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nHello, HTTP world!\n")
 	}
 }
 

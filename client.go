@@ -10,8 +10,16 @@ import (
 	"time"
 )
 
+func getServerAddr() string {
+	server := os.Getenv("SERVER_ADDR")
+	if server == "" {
+		server = "localhost:80"
+	}
+	return server
+}
+
 func main() {
-	conn, err := net.Dial("tcp", os.Getenv("SERVER_ADDR"))
+	conn, err := net.Dial("tcp", getServerAddr())
 	if err != nil {
 		fmt.Println("Error dialing:", err)
 		return
