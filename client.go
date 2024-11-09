@@ -4,13 +4,14 @@ import (
 	"bufio"
 	"fmt"
 	"net"
+	"os"
 	"strings"
 	"test-wss/common"
 	"time"
 )
 
 func main() {
-	conn, err := net.Dial("tcp", "localhost:8080")
+	conn, err := net.Dial("tcp", os.Getenv("SERVER_ADDR"))
 	if err != nil {
 		fmt.Println("Error dialing:", err)
 		return
