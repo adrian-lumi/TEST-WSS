@@ -1,71 +1,97 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"io"
-	"net"
 	"net/http"
-	"strings"
 	"test-wss/common"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
 )
 
-func handleConnection(conn net.Conn) {
-	sessionID := uuid.New().String() // 为每个连接生成一个唯一的会话ID
-	defer conn.Close()
-	fmt.Printf("[%s] Connection accepted\n", sessionID)
+// 定义 WebSocket 连接的结构体
+type WebSocketConnection struct {
+	Conn      *websocket.Conn
+	Connected time.Time
+}
 
-	// 读取 HTTP 请求
-	request, err := http.ReadRequest(bufio.NewReader(conn))
+// 存储所有活跃的 WebSocket 连接
+var connections = make(map[string]*WebSocketConnection)
+
+// WebSocket 升级器配置
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		return true // 允许所有CORS请求
+	},
+}
+
+// 处理 WebSocket 连接的函数
+func handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	wsConn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		fmt.Printf("[%s] Error reading request: %v\n", sessionID, err)
-		common.SendFeishuMessage("Error reading request: " + err.Error())
+		http.Error(w, "Could not open websocket connection", http.StatusBadRequest)
+		return
+	}
+	defer wsConn.Close()
+
+	// 生成唯一标识符，使用 UUID
+	clientID := uuid.New().String()
+
+	// 记录连接时间
+	connectionInfo := &WebSocketConnection{
+		Conn:      wsConn,
+		Connected: time.Now(),
+	}
+
+	// 存储连接信息
+	connections[clientID] = connectionInfo
+
+	// 发送 clientID 给客户端
+	if err := wsConn.WriteMessage(websocket.TextMessage, []byte(clientID)); err != nil {
+		fmt.Println("Failed to send client ID:", err)
+		common.SendFeishuMessage(fmt.Sprintf("Failed to send client ID: %s\n", err))
 		return
 	}
 
-	// 检查是否为 WebSocket 升级请求
-	if strings.ToLower(request.Header.Get("Upgrade")) == "websocket" {
-		// 这里简化处理，实际应用中需要验证更多的头部信息
-		fmt.Fprintf(conn, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n")
-		fmt.Printf("[%s] WebSocket upgrade completed\n", sessionID)
+	fmt.Printf("New connection: %s at %v\n", clientID, connectionInfo.Connected)
 
-		fmt.Fprintf(conn, "[%s] WebSocket session ID: %s\n", sessionID, sessionID)
-		// 进入数据帧处理循环
-		for {
-			buf := make([]byte, 1024)
-			n, err := conn.Read(buf)
-			if err != nil {
-				if err == io.EOF {
-					fmt.Printf("[%s] Connection closed by client\n", sessionID)
-				} else {
-					fmt.Printf("[%s] Error reading from connection: %v\n", sessionID, err)
-				}
-				break
-			}
-			fmt.Printf("[%s] Received: %s\n", sessionID, string(buf[:n]))
+	// 这里可以继续处理消息或其他逻辑
+	for {
+		_, message, err := wsConn.ReadMessage()
+		if err != nil {
+			// 计算连接时长
+			duration := time.Since(connectionInfo.Connected)
+			fmt.Printf("[%s] 连接时长: %s, Error reading message: %s\n", clientID, duration, err)
+			common.SendFeishuMessage(fmt.Sprintf("[%s] 连接时长: %s, Error reading message: %s\n", clientID, duration, err))
+			break
 		}
-	} else {
-		fmt.Fprintf(conn, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nHello, HTTP world!\n")
+		fmt.Printf("Received message from %s: %s\n", clientID, string(message))
+		response := "Received: " + string(message)
+		wsConn.WriteMessage(websocket.TextMessage, []byte(response))
+	}
+
+	// 连接关闭时清理资源
+	closeConnection(clientID)
+}
+
+// 清理连接的函数
+func closeConnection(clientID string) {
+	if conn, ok := connections[clientID]; ok {
+		conn.Conn.Close()
+		delete(connections, clientID)
+		fmt.Printf("[%s] 回收 Connection closed\n", clientID)
 	}
 }
 
+// 主函数，设置路由和启动服务器
 func main() {
-	listener, err := net.Listen("tcp", ":80")
-	if err != nil {
-		fmt.Println("Error listening:", err)
-		return
-	}
-	defer listener.Close()
-	fmt.Println("Server is listening on :80")
-
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			fmt.Println("Error accepting:", err)
-			continue
-		}
-		go handleConnection(conn)
-	}
+	http.HandleFunc("/ws", handleWebSocket)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "Hello, World!")
+	})
+	fmt.Println("Server started on :80")
+	http.ListenAndServe(":80", nil)
 }

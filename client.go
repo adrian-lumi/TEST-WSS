@@ -1,65 +1,56 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"net"
+	"net/url"
 	"os"
-	"strings"
 	"test-wss/common"
 	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 func getServerAddr() string {
 	server := os.Getenv("SERVER_ADDR")
 	if server == "" {
-		server = "localhost:80"
+		server = "localhost:80" // 确保这里的端口是服务器监听的端口
 	}
 	return server
 }
 
 func main() {
-	conn, err := net.Dial("tcp", getServerAddr())
+	serverAddr := getServerAddr()
+	u := url.URL{Scheme: "ws", Host: serverAddr, Path: "/ws"}
+	fmt.Printf("连接到 %s\n", u.String())
+
+	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {
-		fmt.Println("Error dialing:", err)
+		fmt.Println("连接失败:", err)
 		return
 	}
-	defer conn.Close()
+	defer c.Close()
 
-	// 发送 WebSocket 升级请求
-	fmt.Fprint(conn, "GET / HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: x3JJHMbDL1EzLkh9GBhXDw==\r\nSec-WebSocket-Version: 13\r\n\r\n")
-
-	// 使用 bufio.Reader 读取和处理响应
-	reader := bufio.NewReader(conn)
-	sessionID := ""
-	for {
-		line, err := reader.ReadString('\n')
-		if err != nil {
-			fmt.Println("Error reading:", err)
-			common.SendFeishuMessage("Error reading: " + err.Error())
-			return
-		}
-		if strings.HasPrefix(line, "HTTP/1.1 101") {
-			continue // 跳过升级协议的头部信息
-		}
-		if strings.Contains(line, "WebSocket session ID") {
-			sessionID = strings.TrimSpace(strings.Split(line, ":")[1])
-			fmt.Println("Session ID received:", sessionID)
-			break
-		}
+	// 接收从服务器发送的 UUID
+	_, message, err := c.ReadMessage()
+	if err != nil {
+		fmt.Println("读取消息失败:", err)
+		common.SendFeishuMessage(fmt.Sprintf("读取消息失败: %s\n", err))
+		return
 	}
+	clientID := string(message) // 存储 clientID
+	fmt.Printf("从服务器接收到的 client ID: %s\n", clientID)
 
 	// 模拟每3秒发送一次消息
 	ticker := time.NewTicker(3 * time.Second)
 	defer ticker.Stop()
 
 	for range ticker.C {
-		_, err := conn.Write([]byte("Ping from " + sessionID))
+		err := c.WriteMessage(websocket.TextMessage, []byte("Ping"))
 		if err != nil {
-			fmt.Println("Error writing:", err)
-			common.SendFeishuMessage("Session ID: " + sessionID + " Error writing: " + err.Error())
+			fmt.Printf("发送消息时出错, client ID %s: %s\n", clientID, err)
+			common.SendFeishuMessage(fmt.Sprintf("发送消息时出错, client ID %s: %s\n", clientID, err))
 			return
 		}
-		fmt.Printf("Ping sent from session ID %s\n", sessionID)
+		fmt.Printf("发送 Ping, client ID %s\n", clientID)
 	}
 }
