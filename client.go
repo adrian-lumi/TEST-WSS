@@ -18,9 +18,17 @@ func getServerAddr() string {
 	return server
 }
 
+func getScheme() string {
+	scheme := os.Getenv("SCHEME")
+	if scheme == "" {
+		scheme = "ws"
+	}
+	return scheme
+}
+
 func main() {
 	serverAddr := getServerAddr()
-	u := url.URL{Scheme: "ws", Host: serverAddr, Path: "/ws"}
+	u := url.URL{Scheme: getScheme(), Host: serverAddr, Path: "/ws"}
 	fmt.Printf("连接到 %s\n", u.String())
 
 	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
