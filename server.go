@@ -54,13 +54,13 @@ func handleConnection(conn net.Conn) {
 }
 
 func main() {
-	listener, err := net.Listen("tcp", ":8080")
+	listener, err := net.Listen("tcp", ":80")
 	if err != nil {
 		fmt.Println("Error listening:", err)
 		return
 	}
 	defer listener.Close()
-	fmt.Println("Server is listening on :8080")
+	fmt.Println("Server is listening on :80")
 
 	for {
 		conn, err := listener.Accept()
