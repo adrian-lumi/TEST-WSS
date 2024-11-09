@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"test-wss/common"
 	"time"
 
@@ -65,6 +66,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			// 计算连接时长
 			duration := time.Since(connectionInfo.Connected)
 			fmt.Printf("[%s] 连接时长: %s, Error reading message: %s\n", clientID, duration, err)
+			writeToFile(fmt.Sprintf("[%s] 连接时长: %s, Error reading message: %s\n", clientID, duration, err))
 			common.SendFeishuMessage(fmt.Sprintf("[%s] 连接时长: %s, Error reading message: %s\n", clientID, duration, err))
 			break
 		}
@@ -83,6 +85,7 @@ func closeConnection(clientID string) {
 		conn.Conn.Close()
 		delete(connections, clientID)
 		fmt.Printf("[%s] 回收 Connection closed\n", clientID)
+		writeToFile(fmt.Sprintf("[%s] 回收 Connection closed\n", clientID))
 	}
 }
 
@@ -97,4 +100,19 @@ func main() {
 	})
 	fmt.Println("Server started on :80")
 	http.ListenAndServe(":80", nil)
+}
+
+// 写入文件
+func writeToFile(content string) {
+	filePath := "test-wss.log"
+	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Println("Failed to open file:", err)
+		return
+	}
+	defer file.Close()
+	_, err = file.WriteString(content)
+	if err != nil {
+		fmt.Println("Failed to write to file:", err)
+	}
 }
