@@ -22,7 +22,7 @@ func getServerAddr() string {
 func getScheme() string {
 	scheme := os.Getenv("SCHEME")
 	if scheme == "" {
-		scheme = "ws"
+		scheme = "wss"
 	}
 	return scheme
 }

@@ -92,6 +92,9 @@ func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Hello, World!")
 	})
+	http.HandleFunc("/test-feishu-msg", func(w http.ResponseWriter, r *http.Request) {
+		common.SendFeishuMessage("test-feishu-msg")
+	})
 	fmt.Println("Server started on :80")
 	http.ListenAndServe(":80", nil)
 }
