@@ -46,11 +46,11 @@ func main() {
 		},
 	}
 
-	var header http.Header
+	header := http.Header{}
 	if getHttpHost() != "" {
-		header = http.Header{}
 		header.Set("Host", getHttpHost())
 	}
+	header.Set("ClientEnv", mockEnv)
 
 	c, _, err := dialer.Dial(u.String(), header)
 	if err != nil {

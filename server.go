@@ -15,6 +15,7 @@ import (
 type WebSocketConnection struct {
 	Conn      *websocket.Conn
 	Connected time.Time
+	From      string
 }
 
 // 存储所有活跃的 WebSocket 连接
@@ -45,6 +46,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	connectionInfo := &WebSocketConnection{
 		Conn:      wsConn,
 		Connected: time.Now(),
+		From:      r.Header.Get("ClientEnv"),
 	}
 
 	// 存储连接信息
@@ -65,12 +67,12 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			// 计算连接时长
 			duration := time.Since(connectionInfo.Connected)
-			fmt.Printf("[%s] 连接时长: %s, Error reading message: %s\n", clientID, duration, err)
-			writeToFile(fmt.Sprintf("[%s] 连接时长: %s, Error reading message: %s\n", clientID, duration, err))
-			common.SendFeishuMessage(fmt.Sprintf("[%s] 连接时长: %s, Error reading message: %s\n", clientID, duration, err))
+			fmt.Printf("[%s::%s] 连接时长: %s, Error reading message: %s\n", connectionInfo.From, clientID, duration, err)
+			writeToFile(fmt.Sprintf("[%s::%s] 连接时长: %s, Error reading message: %s\n", connectionInfo.From, clientID, duration, err))
+			common.SendFeishuMessage(fmt.Sprintf("[%s::%s] 连接时长: %s, Error reading message: %s\n", connectionInfo.From, clientID, duration, err))
 			break
 		}
-		fmt.Printf("Received message from %s: %s\n", clientID, string(message))
+		fmt.Printf("[%s::%s] Received message: %s\n", connectionInfo.From, clientID, string(message))
 		response := "Received: " + string(message)
 		wsConn.WriteMessage(websocket.TextMessage, []byte(response))
 	}
