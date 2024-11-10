@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"test-wss/common"
@@ -27,10 +28,16 @@ func getScheme() string {
 	return scheme
 }
 
+func getHttpHost() string {
+	return os.Getenv("HTTP_HOST")
+}
+
 func main() {
 	serverAddr := getServerAddr()
 	u := url.URL{Scheme: getScheme(), Host: serverAddr, Path: "/ws"}
 	fmt.Printf("连接到 %s\n", u.String())
+
+	mockEnv := os.Getenv("MOCK_ENV")
 
 	// 创建一个自定义的Dialer，其中包含跳过证书验证的TLS配置
 	dialer := websocket.Dialer{
@@ -39,9 +46,15 @@ func main() {
 		},
 	}
 
-	c, _, err := dialer.Dial(u.String(), nil)
+	var header http.Header
+	if getHttpHost() != "" {
+		header = http.Header{}
+		header.Set("Host", getHttpHost())
+	}
+
+	c, _, err := dialer.Dial(u.String(), header)
 	if err != nil {
-		fmt.Println("连接失败:", err)
+		fmt.Printf("[%s]连接失败: %s\n", mockEnv, err)
 		return
 	}
 	defer c.Close()
@@ -61,12 +74,12 @@ func main() {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		err := c.WriteMessage(websocket.TextMessage, []byte("Ping"))
+		err := c.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("Ping, %s", mockEnv)))
 		if err != nil {
-			fmt.Printf("发送消息时出错, client ID %s: %s\n", clientID, err)
-			common.SendFeishuMessage(fmt.Sprintf("发送消息时出错, client ID %s: %s\n", clientID, err))
+			fmt.Printf("[%s]发送消息时出错, client ID %s: %s\n", mockEnv, clientID, err)
+			common.SendFeishuMessage(fmt.Sprintf("[%s]发送消息时出错, client ID %s: %s\n", mockEnv, clientID, err))
 			return
 		}
-		fmt.Printf("发送 Ping, client ID %s\n", clientID)
+		fmt.Printf("[%s]发送 Ping, client ID %s\n", mockEnv, clientID)
 	}
 }
